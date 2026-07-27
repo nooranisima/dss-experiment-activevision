@@ -188,7 +188,7 @@ def log_to_qualtrics(values: dict):
         print("[qualtrics] SKIPPED: QUALTRICS_SURVEY_ID is empty"); return
     try:
         # Qualtrics embedded-data values must be scalars
-        clean = {k: (v if isinstance(v, (int, float)) else str(v)) for k, v in values.items()}
+        clean = {k: str(v) for k, v in values.items()}  # Qualtrics requires all-string values
         resp = requests.post(
             f"{base}/API/v3/surveys/{QUALTRICS_SURVEY_ID}/responses",
             headers={"X-API-TOKEN": QUALTRICS_API_TOKEN, "Content-Type": "application/json"},
