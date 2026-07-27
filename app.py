@@ -180,27 +180,35 @@ def _qualtrics_base() -> str:
 
 def log_to_qualtrics(values: dict):
     base = _qualtrics_base()
-    if not (base and QUALTRICS_API_TOKEN and QUALTRICS_SURVEY_ID):
-        return
+    if not base:
+        print("[qualtrics] SKIPPED: QUALTRICS_DATACENTER is empty"); return
+    if not QUALTRICS_API_TOKEN:
+        print("[qualtrics] SKIPPED: QUALTRICS_API_TOKEN is empty"); return
+    if not QUALTRICS_SURVEY_ID:
+        print("[qualtrics] SKIPPED: QUALTRICS_SURVEY_ID is empty"); return
     try:
         # Qualtrics embedded-data values must be scalars
         clean = {k: (v if isinstance(v, (int, float)) else str(v)) for k, v in values.items()}
-        requests.post(
+        resp = requests.post(
             f"{base}/API/v3/surveys/{QUALTRICS_SURVEY_ID}/responses",
             headers={"X-API-TOKEN": QUALTRICS_API_TOKEN, "Content-Type": "application/json"},
             json={"values": clean},
             timeout=20,
         )
+        if resp.status_code == 200:
+            print(f"[qualtrics] OK trial={values.get('trial_overall')} "
+                  f"id={resp.json().get('result', {}).get('responseId', '?')}")
+        else:
+            print(f"[qualtrics] FAILED {resp.status_code}: {resp.text[:300]}")
     except Exception as e:
-        print(f"[qualtrics] logging failed: {e}")
-
+        print(f"[qualtrics] EXCEPTION: {e}")
 
 def log_trial(record: dict):
     """Redis is the primary store; Qualtrics is logged async as secondary."""
     key = K_LOG.format(pid=record["participant_id"], trial=record["trial_overall"])
     r.set(key, json.dumps(record))
     r.rpush(K_LOG_INDEX, key)
-    threading.Thread(target=log_to_qualtrics, args=(record,), daemon=True).start()
+    log_to_qualtrics(record)
 
 
 # ----------------------------------------------------------------------------
